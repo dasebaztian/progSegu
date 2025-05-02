@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registro{% endblock %}
+
+
+{% block contenido %}
+{% if errores %}
+<div id="errores" class="alert bg-secondary text-dark alert-dismissible text-white">
+    
+    <strong>Errores:</strong>
+    <ul id="lista-errores">
+	{% for error in errores %}
+	<li>{{ error }}</li>
+	{% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<form class="was-validated" action="/registro/" method="POST">
+     {% csrf_token %} 
+     <div class="mb-3 mt-3">
+	 	<label for="nombre">Nombre completo:</label>
+	 	<input type="text" class="form-control" id="nombre" placeholder="Ingresa tu nombre completo" name="nombre" pattern="[a-zA-Z0-9 _-]+" required>
+    <div class="valid-feedback">¡OK!</div>
+    <div class="invalid-feedback">El nombre del usuario es obligatorio y sin caracteres especiales</div>
+     </div>
+     
+     <div class="mb-3 mt-3">
+		<label for="usuario">Usuario:</label>
+		<input type="text" class="form-control" id="usuario" placeholder="Ingresa tu usuario" name="usuario" required>
+    <div class="valid-feedback">¡OK!</div>
+    <div class="invalid-feedback">El Username es obligatorio y sin caracteres especiales</div>
+     </div>
+
+     <div class="mb-3 mt-3">
+	 	<label for="email">Correo electronico:</label>
+	 	<input type="email" class="form-control" id="email" placeholder="Ingresa tu correo" name="email" pattern="[a-zA-Z0-9 _-@]+" required>
+     <div class="valid-feedback">¡OK!</div>
+     <div class="invalid-feedback">El correo es obligatorio</div>
+     </div>
+     
+    <div class="mb-3">
+		<label for="passwd">Contraseña:</label>
+		<input type="password" class="form-control" id="passwd" placeholder="Ingresa tu contraseña" name="passwd" required>
+    <div class="valid-feedback">¡OK!</div>
+    <div class="invalid-feedback">La contraseña es obligatoria y sin caracteres especiales</div>
+    </div>
+    
+    <div class="mb-3">
+		<label for="passwd2">Confirmación:</label>
+		<input type="password" class="form-control" id="passwd2" placeholder="Confirma tu contraseña" name="passwd2" required>
+    <div class="valid-feedback">¡OK!</div>
+    <div class="invalid-feedback">Asegurate de ingresar la misma contraseña</div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Submit</button>
+</form>
+
+
+{% endblock %}

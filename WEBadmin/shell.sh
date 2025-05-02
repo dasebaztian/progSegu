@@ -5,5 +5,5 @@ while read -r linea; do
 #    echo "$linea"
 done < <(ccdecrypt -c secretos.env.cpt)
 
-python3 manage.py runserver
+python3 manage.py shell
 
