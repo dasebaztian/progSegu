@@ -2,8 +2,7 @@
 
 while read -r linea; do    
     export "$linea"
-#    echo "$linea"
+    echo "$linea"
 done < <(ccdecrypt -c secretos.env.cpt)
 
-python3 manage.py runserver
-
+python3 manage.py runserver 0.0.0.0:8000

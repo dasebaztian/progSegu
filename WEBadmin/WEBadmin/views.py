@@ -4,9 +4,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 
 from WEBadmin import hasher as hash
-from WEBadmin import decodadores
+from django.utils import timezone
+from datetime import timedelta
+from WEBadmin import decoradores
 from WEBadmin.forms import LoginForm
 from database.models import Usuario
+from database.models import OTP
+from WEBadmin import enviar_otp as telegram
 
 def campo_vacio(campo):
     return campo.strip() == ''
@@ -31,7 +35,7 @@ def login(request):
                 if hash.verificarPassword(passwd, passwd_bd, salt_bd):
                     request.session['logueado'] = True
                     request.session['usuario'] = usuario
-                    return redirect('/dashboard')
+                    return redirect('/login-otp')
                 else:
                     errores.append("Usuario y/o Contraseña incorrectos")
             except Usuario.DoesNotExist:
@@ -40,21 +44,82 @@ def login(request):
             errores.append("Formulario inválido. Verifica los campos.")
         return render(request, 'login.html', {'form': form, 'errores': errores})
 
-@decodadores.verificar_login
+@decoradores.verificar_login
+def login_otp(request):
+    t = "otp.html"
+    if request.method == 'GET':
+        usuario_nombre = request.session.get('usuario')
+        
+        if not usuario_nombre:
+            return redirect('/login')
+        
+        try:
+            usuario_obj = Usuario.objects.get(usuario=usuario_nombre)
+        except Usuario.DoesNotExist:
+            return render(request, t, {'errores': ['Usuario no válido.']})
+        
+        codigo = telegram.generar_mensaje()
+
+        # Enviar mensaje y guardar solo si fue exitoso
+        if telegram.mandar_mensaje(codigo):
+            OTP.objects.create(
+                usuario=usuario_obj,
+                password_otp=codigo,
+                fecha_vencimiento=timezone.localtime(timezone.now()) + timedelta(minutes=10)
+            )
+            return render(request, t)
+        else:
+            return render(request, t, {'errores': ['No se pudo enviar el código. Intenta más tarde.']})
+    elif request.method == 'POST':
+        codigo_ingresado = request.POST.get('otp', '').strip()
+
+        if not codigo_ingresado.isdigit() or len(codigo_ingresado) != 8:
+            return render(request, t, {'errores': ['El código debe ser un número de 8 dígitos.']})
+        
+        usuario_nombre = request.session.get('usuario')
+        
+        if not usuario_nombre:
+            return redirect('/login')
+        ahora = timezone.localtime(timezone.now())
+
+        try:
+            usuario_obj = Usuario.objects.get(usuario=usuario_nombre)
+        except Usuario.DoesNotExist:
+            return render(request, t, {'errores': ['Usuario no válido.']})
+
+        # Buscar un OTP válido
+        otp_valido = OTP.objects.filter(
+            usuario=usuario_obj,
+            password_otp=codigo_ingresado,
+            fecha_vencimiento__gte=ahora
+        ).first()
+
+        if otp_valido:
+            # (Opcional) eliminar el OTP usado
+            otp_valido.delete()
+
+            # Redirigir al dashboard u otra página protegida
+            request.session['logueado'] = True
+            return redirect('/dashboard')
+        else:
+            return render(request, t, {'errores': ['Código incorrecto o expirado.']})
+
+
+@decoradores.verificar_login_otp
 def panel(request):
     t = "base.html"
     errores = []
     if request.method == 'GET':
         return render(request,t)
 
-@decodadores.verificar_login 
+@decoradores.verificar_login_otp
 def registrar_servidor(request):
     t = "base.html"
     errores = []
     if request.method == 'GET':
         return render(request,t)
 
-@decodadores.verificar_login 
+@decoradores.verificar_login_otp
 def registrar_servicio(request):
     t = "base.html"
     errores = []
