@@ -12,6 +12,6 @@ def verificar_login(vista):
 def verificar_login_otp(vista):
     def interna(request, *args, **kargs):
         if not request.session.get('logueado_otp', False):
-            return redirect('/login-otp')
+            return redirect('/loginotp')
         return vista(request, *args, **kargs)
     return interna

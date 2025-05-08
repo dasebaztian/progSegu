@@ -21,9 +21,9 @@ from WEBadmin import views as vistas
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('login/', vistas.login),
-    path('login-otp',vistas.login_otp),
+    path('loginotp',vistas.login_otp),
     path('dashboard/', vistas.panel),
-    path('signup-servidor', vistas.registrar_servidor),
-    path('signup-servicio', vistas.registrar_servicio),
+    path('signupservidor', vistas.registrar_servidor),
+    path('signupservicio', vistas.registrar_servicio),
     path('', vistas.login),
 ]

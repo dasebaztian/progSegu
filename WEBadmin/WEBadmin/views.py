@@ -35,7 +35,7 @@ def login(request):
                 if hash.verificarPassword(passwd, passwd_bd, salt_bd):
                     request.session['logueado'] = True
                     request.session['usuario'] = usuario
-                    return redirect('/login-otp')
+                    return redirect('/loginotp')
                 else:
                     errores.append("Usuario y/o Contraseña incorrectos")
             except Usuario.DoesNotExist:
@@ -49,15 +49,9 @@ def login_otp(request):
     t = "otp.html"
     if request.method == 'GET':
         usuario_nombre = request.session.get('usuario')
-        
-        if not usuario_nombre:
-            return redirect('/login')
-        
-        try:
-            usuario_obj = Usuario.objects.get(usuario=usuario_nombre)
-        except Usuario.DoesNotExist:
-            return render(request, t, {'errores': ['Usuario no válido.']})
-        
+
+        usuario_obj = Usuario.objects.get(usuario=usuario_nombre)
+
         codigo = telegram.generar_mensaje()
 
         # Enviar mensaje y guardar solo si fue exitoso
@@ -74,18 +68,11 @@ def login_otp(request):
         codigo_ingresado = request.POST.get('otp', '').strip()
 
         if not codigo_ingresado.isdigit() or len(codigo_ingresado) != 8:
-            return render(request, t, {'errores': ['El código debe ser un número de 8 dígitos.']})
+            return render(request, t, {'errores': ['El código debe de estar en el formato adecuado.']})
         
         usuario_nombre = request.session.get('usuario')
-        
-        if not usuario_nombre:
-            return redirect('/login')
         ahora = timezone.localtime(timezone.now())
-
-        try:
-            usuario_obj = Usuario.objects.get(usuario=usuario_nombre)
-        except Usuario.DoesNotExist:
-            return render(request, t, {'errores': ['Usuario no válido.']})
+        usuario_obj = Usuario.objects.get(usuario=usuario_nombre)
 
         # Buscar un OTP válido
         otp_valido = OTP.objects.filter(
@@ -99,7 +86,7 @@ def login_otp(request):
             otp_valido.delete()
 
             # Redirigir al dashboard u otra página protegida
-            request.session['logueado'] = True
+            request.session['logueado_otp'] = True
             return redirect('/dashboard')
         else:
             return render(request, t, {'errores': ['Código incorrecto o expirado.']})
