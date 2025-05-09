@@ -21,12 +21,18 @@ def generar_mensaje() -> str:
     return random_string
     
 def mandar_mensaje(mensaje: str):
-    url =  f'https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={CHAT_ID}&parse_mode=Markdown&text={mensaje}'
+    url =  f'https://api.telegram.org/bot{TOKEN}/sendMessage'
+
+    payload = {
+        'chat_id': CHAT_ID,
+        'text': mensaje,
+        'parse_mode': 'Markdown'
+    }
     try:
-        requests.get(url)
+        requests.get(url, data=payload)
         print("Mande: " + url)
-        print(TOKEN)
-        print(CHAT_ID)
+        #print(TOKEN)
+        #print(CHAT_ID)
         return True
     except:
         return False

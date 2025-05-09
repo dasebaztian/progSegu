@@ -21,6 +21,7 @@ def login(request):
         form = LoginForm()
         request.session['logueado'] = False
         request.session['usuario'] = ''
+        request.session['logueado_otp'] = False
         return render(request, 'login.html', {'form': form})
     
     elif request.method == 'POST':
@@ -59,7 +60,7 @@ def login_otp(request):
             OTP.objects.create(
                 usuario=usuario_obj,
                 password_otp=codigo,
-                fecha_vencimiento=timezone.localtime(timezone.now()) + timedelta(minutes=10)
+                fecha_vencimiento=timezone.localtime(timezone.now()) + timedelta(minutes=1)
             )
             return render(request, t)
         else:
@@ -83,7 +84,7 @@ def login_otp(request):
 
         if otp_valido:
             # (Opcional) eliminar el OTP usado
-            otp_valido.delete()
+            #otp_valido.delete()
 
             # Redirigir al dashboard u otra página protegida
             request.session['logueado_otp'] = True
