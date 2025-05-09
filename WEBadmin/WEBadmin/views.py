@@ -12,7 +12,7 @@ from database.models import Usuario
 from database.models import OTP
 from WEBadmin import enviar_otp as telegram
 
-def campo_vacio(campo: string) -> String:
+def campo_vacio(campo: str) -> str:
     """Campo vacio se encarga de validar que la entrada del usuario no este vacia
 
     Args:

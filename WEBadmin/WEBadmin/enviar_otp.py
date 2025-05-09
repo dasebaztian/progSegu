@@ -9,8 +9,12 @@ import hashlib
 TOKEN = str(os.environ.get('TOKEN'))
 CHAT_ID = str(os.environ.get('CHATID'))
 
-# CUIDADO la rutina usa get, hay que cambiar por POST
 def generar_mensaje() -> str:
+    """Genera el código OTP a través de la fecha, entropia del sistema y una semilla
+
+    Returns:
+        str: Regresa el código OTP
+    """    
     timestamp = int(datetime.now().timestamp() * 1_000_000)
     entropia_sistema = os.urandom(16)
     combinacion_semilla = str(timestamp).encode() + entropia_sistema
@@ -20,7 +24,15 @@ def generar_mensaje() -> str:
     random_string = ''.join(random.choice(digits) for _ in range(8))
     return random_string
     
-def mandar_mensaje(mensaje: str):
+def mandar_mensaje(mensaje: str) -> bool:
+    """Se encarga de enviar el código al chat id seleccionado
+
+    Args:
+        mensaje (str): Código OTP para el sistema
+
+    Returns:
+        bool: Regresa True o False dependiendo de si se concreto el envío del mensaje
+    """    
     url =  f'https://api.telegram.org/bot{TOKEN}/sendMessage'
 
     payload = {
@@ -31,8 +43,6 @@ def mandar_mensaje(mensaje: str):
     try:
         requests.get(url, data=payload)
         print("Mande: " + url)
-        #print(TOKEN)
-        #print(CHAT_ID)
         return True
     except:
         return False
