@@ -12,10 +12,28 @@ from database.models import Usuario
 from database.models import OTP
 from WEBadmin import enviar_otp as telegram
 
-def campo_vacio(campo):
+def campo_vacio(campo: string) -> String:
+    """Campo vacio se encarga de validar que la entrada del usuario no este vacia
+
+    Args:
+        campo (string): Texto enviado por el usuario
+
+    Returns:
+        String: regresa el campo sin espacios
+    """    
     return campo.strip() == ''
 
-def login(request):
+def login(request: HttpRrequest) -> HttpResponse:
+    """Se encarga de validar el tipo de petición, en casos de GET responde con la página de login,
+    mientras que en casos de POST esta hace las validaciones necesarias para autenticar al usuario dentro
+    del sistema.
+
+    Args:
+        request (HttpRrequest): Solicitud del cliente
+
+    Returns:
+        HttpResponse: Respuesta del servidor de acuerdo a las validaciones o tipo de solicitud.
+    """    
     errores = []
     if request.method == 'GET':
         form = LoginForm()
@@ -46,7 +64,17 @@ def login(request):
         return render(request, 'login.html', {'form': form, 'errores': errores})
 
 @decoradores.verificar_login
-def login_otp(request):
+def login_otp(request: HttpRequest) -> HttpResponse:
+    """Esta vista responde a cuando un usuario ya autenticado por contraseña necesita autenticarse a través de su OTP
+    en este caso el servido genera el OTP y de acuerdo a la petición del cliente hace las validaciones
+    necesarias
+
+    Args:
+        request (HttpRequest): Solicitud del cliente
+
+    Returns:
+        HttpResponse: Respuesta del servidor
+    """    
     t = "otp.html"
     if request.method == 'GET':
         usuario_nombre = request.session.get('usuario')
