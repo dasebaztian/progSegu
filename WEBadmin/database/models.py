@@ -17,3 +17,8 @@ class OTP(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     password_otp = models.CharField(max_length=8)
     fecha_vencimiento = models.DateTimeField(default=default_expiration)
+
+class ContadorIntentos(models.Model):
+    ip = models.GenericIPAddressField(primary_key=True)
+    contador = models.PositiveIntegerField()
+    ultimo_intento = models.DateTimeField()

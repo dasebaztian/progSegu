@@ -42,7 +42,6 @@ def mandar_mensaje(mensaje: str) -> bool:
     }
     try:
         requests.get(url, data=payload)
-        print("Mande: " + url)
         return True
     except:
         return False

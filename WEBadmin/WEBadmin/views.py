@@ -1,15 +1,18 @@
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.template import Template, Context
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 
+from WEBadmin import settings
 from WEBadmin import hasher as hash
 from django.utils import timezone
 from datetime import timedelta
 from WEBadmin import decoradores
+from WEBadmin import login_chequeo as login_check
 from WEBadmin.forms import LoginForm
 from database.models import Usuario
 from database.models import OTP
+from database.models import ContadorIntentos
 from WEBadmin import enviar_otp as telegram
 
 def campo_vacio(campo: str) -> str:
@@ -23,7 +26,7 @@ def campo_vacio(campo: str) -> str:
     """    
     return campo.strip() == ''
 
-def login(request: HttpRrequest) -> HttpResponse:
+def login(request: HttpRequest) -> HttpResponse:
     """Se encarga de validar el tipo de petición, en casos de GET responde con la página de login,
     mientras que en casos de POST esta hace las validaciones necesarias para autenticar al usuario dentro
     del sistema.
@@ -40,25 +43,36 @@ def login(request: HttpRrequest) -> HttpResponse:
         request.session['logueado'] = False
         request.session['usuario'] = ''
         request.session['logueado_otp'] = False
-        return render(request, 'login.html', {'form': form})
-    
+        return render(request, 'login.html', {'form': form}) 
     elif request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
             usuario = form.cleaned_data['usuario']
             passwd = form.cleaned_data['passwd']
+
+            permitido, intentos = login_check.tienes_intentos_login(request)
+            if not permitido:
+                errores.append(f'Debes esperar {settings.SEGUNDOS_INTENTO} segundos antes de volver a intentar.')
+                return render(request, 'login.html', {'form': form, 'errores': errores})
             try:
                 usuario_bd = Usuario.objects.get(usuario=usuario)
                 salt_bd = usuario_bd.salt_passwd
                 passwd_bd = usuario_bd.passwd
                 if hash.verificarPassword(passwd, passwd_bd, salt_bd):
+                    ip = login_check.get_client_ip(request)
+                    try:
+                        registro = ContadorIntentos.objects.get(pk=ip)
+                        registro.contador = 0
+                        registro.save()
+                    except ContadorIntentos.DoesNotExist:
+                        pass
                     request.session['logueado'] = True
                     request.session['usuario'] = usuario
                     return redirect('/loginotp')
                 else:
-                    errores.append("Usuario y/o Contraseña incorrectos")
+                    errores.append(f"Usuario y/o Contraseña incorrectos. Intento {intentos} de {settings.NUMERO_INTENTOS}")
             except Usuario.DoesNotExist:
-                errores.append("Usuario y/o Contraseña incorrectos")
+                errores.append(f"Usuario y/o Contraseña incorrectos. Intento {intentos} de {settings.NUMERO_INTENTOS}")
         else:
             errores.append("Formulario inválido. Verifica los campos.")
         return render(request, 'login.html', {'form': form, 'errores': errores})
@@ -111,9 +125,6 @@ def login_otp(request: HttpRequest) -> HttpResponse:
         ).first()
 
         if otp_valido:
-            # (Opcional) eliminar el OTP usado
-            #otp_valido.delete()
-
             # Redirigir al dashboard u otra página protegida
             request.session['logueado_otp'] = True
             return redirect('/dashboard')
