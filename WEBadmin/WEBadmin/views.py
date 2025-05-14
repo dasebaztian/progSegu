@@ -128,8 +128,11 @@ def login_otp(request: HttpRequest) -> HttpResponse:
             # Redirigir al dashboard u otra página protegida
             request.session['logueado_otp'] = True
             return redirect('/dashboard')
+            otp_valido.delete()
         else:
+            request.session['logueado'] = True
             return render(request, t, {'errores': ['Código incorrecto o expirado.']})
+            otp_valido.delete
 
 
 @decoradores.verificar_login_otp

@@ -1,0 +1,6 @@
+projectKey=segura:webadmin
+serverUrl=http://127.0.0.1:9000
+serverVersion=25.4.0.105899
+dashboardUrl=http://127.0.0.1:9000/dashboard?id=segura%3Awebadmin
+ceTaskId=be9b6a2d-cb74-4f37-9d07-39cdb555c3c0
+ceTaskUrl=http://127.0.0.1:9000/api/ce/task?id=be9b6a2d-cb74-4f37-9d07-39cdb555c3c0
