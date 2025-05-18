@@ -125,15 +125,14 @@ def login_otp(request: HttpRequest) -> HttpResponse:
         ).first()
 
         if otp_valido:
-            # Redirigir al dashboard u otra página protegida
             request.session['logueado_otp'] = True
-            return redirect('/dashboard')
             otp_valido.delete()
+            return redirect('/dashboard')
+            
         else:
-            request.session['logueado'] = True
-            return render(request, t, {'errores': ['Código incorrecto o expirado.']})
-            otp_valido.delete
-
+            request.session.flush()
+            ultimo_otp = OTP.objects.all().last().delete()
+            return redirect('/login')
 
 @decoradores.verificar_login_otp
 def panel(request):
