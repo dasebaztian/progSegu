@@ -22,3 +22,9 @@ class ContadorIntentos(models.Model):
     ip = models.GenericIPAddressField(primary_key=True)
     contador = models.PositiveIntegerField()
     ultimo_intento = models.DateTimeField()
+
+class Servidor(models.Model):
+    nombre_servidor = models.CharField(max_length=50, unique=True)
+    usuario = models.CharField(max_length=50)
+    ip = models.GenericIPAddressField(primary_key=True)
+    puerto = models.PositiveIntegerField(default=22)
