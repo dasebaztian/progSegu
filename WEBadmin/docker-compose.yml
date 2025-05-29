@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+   app:
+      image: webadmin-basado-en-python-3.12
+      depends_on:
+         - db
+      #build: ./contenedorApp
+      environment:
+         SECRET_KEY: ${SECRET_KEY}
+         DB_NAME: ${DB_NAME}
+         DB_USER: ${DB_USER}
+         DB_PASS: ${DB_PASS}
+         DB_HOST: ${DB_HOST}
+         DB_PORT: 3306
+      volumes:
+        - ./contenedorApp/WEBadmin:/code
+      deploy:
+         resources:
+            limits:
+               cpus: "2"
+               memory: "1024M"
+
+   db:
+      image: mariadb
+      restart: always
+      environment:
+         MARIADB_ROOT_PASSWORD: ${ROOT_DB_PASS}
+         MARIADB_DATABASE: ${DB_NAME}
+         MARIADB_USER: ${DB_USER}
+         MARIADB_PASSWORD: ${DB_PASS}
+      volumes:
+         - ./data:/var/lib/mysql
+      deploy:
+         resources:
+            limits:
+               cpus: "2"
+               memory: "1024M"
+
+
+   nginx:
+      image: nginx
+      restart: always
+      ports:
+        - 80:80
+      volumes:
+        - ./nginx:/etc/nginx/conf.d
+      deploy:
+         resources:
+            limits:
+               cpus: "2"
+               memory: "1024M"
