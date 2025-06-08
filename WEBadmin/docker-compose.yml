@@ -43,8 +43,12 @@ services:
       restart: always
       ports:
         - 80:80
+        - 443:443
       volumes:
         - ./nginx:/etc/nginx/conf.d
+        - ./static:/static
+        - ./certificados:/certs
+        - ./nginx/conf/nginx.conf:/etc/nginx/nginx.conf:ro
       deploy:
          resources:
             limits:
