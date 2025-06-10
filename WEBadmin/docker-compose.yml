@@ -13,6 +13,8 @@ services:
          DB_PASS: ${DB_PASS}
          DB_HOST: ${DB_HOST}
          DB_PORT: 3306
+         RECAPTCHA_PUBLIC_KEY: ${RECAPTCHA_PUBLIC_KEY}
+         RECAPTCHA_PRIVATE_KEY: ${RECAPTCHA_PRIVATE_KEY}
       volumes:
         - ./contenedorApp/WEBadmin:/code
       deploy:
