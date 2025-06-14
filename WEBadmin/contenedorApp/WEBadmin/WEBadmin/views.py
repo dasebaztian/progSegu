@@ -3,17 +3,23 @@ from django.template import Template, Context
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 
-from WEBadmin import settings
-from WEBadmin import hasher as hash
+
 from django.utils import timezone
 from datetime import timedelta
+import paramiko
+from os import urandom
+
+from WEBadmin import settings
+from WEBadmin import hasher as hash
 from WEBadmin import decoradores
 from WEBadmin import login_chequeo as login_check
-from WEBadmin.forms import LoginForm
-from database.models import Usuario
-from database.models import OTP
-from database.models import ContadorIntentos
 from WEBadmin import enviar_otp as telegram
+from WEBadmin.forms import LoginForm
+from WEBadmin.verificaciones import esta_activo, puerto_abierto
+
+from database.models import Usuario, OTP, ContadorIntentos, Servidor, Servicio
+
+
 
 def campo_vacio(campo: str) -> str:
     """Campo vacio se encarga de validar que la entrada del usuario no este vacia
@@ -136,17 +142,93 @@ def login_otp(request: HttpRequest) -> HttpResponse:
 
 @decoradores.verificar_login_otp
 def panel(request):
-    t = "base.html"
+    t = "panel.html"
     errores = []
-    if request.method == 'GET':
-        return render(request,t)
+
+    servidores = Servidor.objects.all()
+    servicios = Servicio.objects.select_related('servidor').all()
+
+    for servidor in servidores:
+        if esta_activo(str(servidor.ip)):
+            servicios_del_servidor = servicios.filter(servidor=servidor)
+            for servicio in servicios_del_servidor:
+                if puerto_abierto(str(servidor.ip), servicio.puerto):
+                    servicio.estado = "activo"
+                else:
+                    servicio.estado = "inactivo"
+                servicio.save()
+        else:
+            servicios.filter(servidor=servidor).update(estado="servidor caído")
+
+    return render(request, t, {
+        "servidores": servidores,
+        "servicios": Servicio.objects.select_related('servidor').all(),
+        "errores": errores
+    })
 
 @decoradores.verificar_login_otp
 def registrar_servidor(request):
-    t = "base.html"
+    t = "registrar_servidor.html"
     errores = []
     if request.method == 'GET':
         return render(request,t)
+    elif request.method == 'POST':
+        nombre_servidor = request.POST.get('nombre_servidor', '').strip()
+        usuario_ssh = request.POST.get('usuario', '').strip()
+        ip = request.POST.get('ip', '').strip()
+        puerto = request.POST.get('puerto', '').strip()
+        password = request.POST.get('password', '').strip()
+
+        if not all([nombre_servidor, usuario_ssh, ip, puerto, password]):
+            errores.append("Todos los campos son obligatorios.")
+            return render(request, t, {'errores': errores})
+
+        try:
+            puerto = int(puerto)
+            if puerto < 1 or puerto > 65535:
+                raise ValueError("Puerto fuera de rango.")
+        except ValueError:
+            errores.append("El puerto debe ser un número entre 1 y 65535.")
+            return render(request, t, {'errores': errores})
+
+        if Servidor.objects.filter(ip=ip).exists():
+            errores.append("Ya existe un servidor registrado con esa IP.")
+            return render(request, t, {'errores': errores})
+
+        try:
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.connect(
+                hostname=ip,
+                port=puerto,
+                username=usuario_ssh,
+                password=password,
+                timeout=5
+            )
+            client.close()
+
+            salt = urandom(16)
+            servidor = Servidor.objects.create(
+                nombre_servidor=nombre_servidor,
+                usuario=usuario_ssh,
+                ip=ip,
+                puerto=puerto,
+                salt_passwd=salt,
+                password=hash.hashearPassword(password, salt)
+            )
+
+            Servicio.objects.create(
+                nombre="ssh",
+                servidor=servidor,
+                puerto=puerto,
+                estado="activo"
+            )
+
+            return render(request, t, {'mensaje': f"Servidor '{nombre_servidor}' registrado correctamente."})
+
+        except Exception as e:
+            errores.append(f"No se pudo conectar con el servidor: {str(e)}")
+            return render(request, t, {'errores': errores})
 
 @decoradores.verificar_login_otp
 def registrar_servicio(request):

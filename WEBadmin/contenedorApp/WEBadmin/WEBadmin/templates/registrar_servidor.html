@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block titulo %}Registrar Servidor{% endblock %}
+
+{% block nav_extra %}
+<li class="nav-item">
+    <a class="nav-link" href="/dashboard">Panel</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/registrarservidor">Registrar Servidor</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/registrarservicio">Registrar Servicio</a>
+</li>
+{% endblock %}
+
+{% block contenido %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <h2 class="text-primary-custom mb-4">Registrar nuevo servidor</h2>
+        <form method="POST" class="bg-dark-custom p-4 rounded border">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label">Nombre del Servidor</label>
+                <input type="text" class="form-control" name="nombre_servidor" placeholder="Nombre del servidor" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Usuario SSH</label>
+                <input type="text" class="form-control" name="usuario" placeholder="Usuario SSH" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">IP del Servidor</label>
+                <input type="text" class="form-control" name="ip" placeholder="IP del servidor" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Puerto SSH</label>
+                <input type="number" class="form-control" name="puerto" placeholder="Puerto SSH" value="22" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Contraseña SSH</label>
+                <input type="password" class="form-control" name="password" placeholder="Contraseña SSH" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Registrar Servidor</button>
+        </form>
+
+        {% if errores %}
+        <div class="alert alert-danger mt-4">
+            <ul class="mb-0">
+                {% for error in errores %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if mensaje %}
+        <div class="alert alert-success mt-4">
+            {{ mensaje }}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

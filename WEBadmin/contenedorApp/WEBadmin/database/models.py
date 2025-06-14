@@ -2,6 +2,8 @@ from django.db import models
 
 from datetime import timedelta
 from django.utils import timezone
+from django.core.validators import MaxValueValidator, MinValueValidator
+
 
 
 def default_expiration():
@@ -27,4 +29,23 @@ class Servidor(models.Model):
     nombre_servidor = models.CharField(max_length=50, unique=True)
     usuario = models.CharField(max_length=50)
     ip = models.GenericIPAddressField(primary_key=True)
-    puerto = models.PositiveIntegerField(default=22)
+    puerto = models.PositiveIntegerField(
+    default=22,
+    validators=[
+        MinValueValidator(1),
+        MaxValueValidator(65535)
+    ]
+)
+    salt_passwd = models.BinaryField(default=b'')
+    password = models.CharField(max_length=129)
+
+class Servicio(models.Model):
+    nombre = models.CharField(max_length=100)
+    servidor = models.ForeignKey(Servidor, on_delete=models.CASCADE)
+    puerto = models.PositiveIntegerField(
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(65535)
+        ]
+    )
+    estado = models.CharField(max_length=20, default="desconocido")

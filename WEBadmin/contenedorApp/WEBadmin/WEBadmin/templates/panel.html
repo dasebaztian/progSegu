@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block titulo %}Panel de Control{% endblock %}
+
+{% block nav_extra %}
+<li class="nav-item">
+    <a class="nav-link" href="/dashboard">Panel</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/registrarservidor">Registrar Servidor</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="/registrarservicio">Registrar Servicio</a>
+</li>
+{% endblock %}
+
+{% block contenido %}
+{% if errores %}
+<div id="errores" class="alert bg-secondary text-dark alert-dismissible text-white">
+    <strong>Errores:</strong>
+    <ul id="lista-errores">
+        {% for error in errores %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-6">
+    <h2 class="text-primary-custom">Servidores Registrados</h2>
+    <ul class="list-group">
+      {% for servidor in servidores %}
+        <li class="list-group-item bg-dark-custom text-white">
+          <strong>{{ servidor.nombre_servidor }}</strong><br>
+          IP: {{ servidor.ip }}<br>
+          Usuario SSH: {{ servidor.usuario }}<br>
+          Puerto: {{ servidor.puerto }}
+        </li>
+      {% empty %}
+        <li class="list-group-item">No hay servidores registrados.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  
+  <div class="col-md-6">
+    <h2 class="text-primary-custom">Servicios Registrados</h2>
+    <ul class="list-group">
+      {% for servicio in servicios %}
+        <li class="list-group-item bg-dark-custom text-white">
+          <strong>{{ servicio.nombre }}</strong> en servidor 
+          <em>{{ servicio.servidor.nombre_servidor }}</em><br>
+          Estado: 
+          {% if servicio.estado == "activo" %}
+            <span class="text-success fw-bold">Activo</span>
+          {% elif servicio.estado == "inactivo" %}
+            <span class="text-danger fw-bold">Inactivo</span>
+          {% else %}
+            <span class="text-warning fw-bold">{{ servicio.estado }}</span>
+          {% endif %}
+          <form method="get" action="/dashboard/" style="display:inline;">
+            <button class="btn btn-sm btn-outline-light ms-2" title="Refrescar estado">
+              Reintentar
+            </button>
+          </form>
+        </li>
+      {% empty %}
+        <li class="list-group-item">No hay servicios registrados.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}
