@@ -23,7 +23,7 @@ urlpatterns = [
     path('login/', vistas.login),
     path('loginotp',vistas.login_otp),
     path('dashboard/', vistas.panel),
-    path('signupservidor', vistas.registrar_servidor),
-    path('signupservicio', vistas.registrar_servicio),
+    path('signupservidor/', vistas.registrar_servidor),
+    path('signupservicio/', vistas.registrar_servicio),
     path('', vistas.login),
 ]

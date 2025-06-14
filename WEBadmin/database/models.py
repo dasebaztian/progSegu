@@ -2,6 +2,7 @@ from django.db import models
 
 from datetime import timedelta
 from django.utils import timezone
+from django.core.validators import RegexValidator
 
 
 def default_expiration():
@@ -28,3 +29,21 @@ class Servidor(models.Model):
     usuario = models.CharField(max_length=50)
     ip = models.GenericIPAddressField(primary_key=True)
     puerto = models.PositiveIntegerField(default=22)
+    llave_ssh = models.TextField(max_length=700)
+    def __str__(self):
+        return f"{self.usuario}@{self.ip}"
+
+class Servicio(models.Model):
+    nombre = models.CharField(
+        max_length=100,
+        validators=[
+            RegexValidator(
+                regex=r'^[A-Za-z]+$',
+            )
+        ]
+    )
+    servidor = models.ForeignKey(Servidor, on_delete=models.CASCADE)
+    class Meta:
+        unique_together = ('nombre', 'servidor')
+    def __str__(self):
+        return f"{self.nombre} en {self.servidor}"

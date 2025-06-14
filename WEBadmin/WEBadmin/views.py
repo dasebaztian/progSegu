@@ -13,7 +13,15 @@ from WEBadmin.forms import LoginForm
 from database.models import Usuario
 from database.models import OTP
 from database.models import ContadorIntentos
+from database.models import Servidor, Servicio
 from WEBadmin import enviar_otp as telegram
+from django.core.validators import validate_ipv46_address
+from django.core.exceptions import ValidationError
+import re
+
+
+SERVICIO_REGEX = re.compile(r'^[A-Za-z]+$')
+USUARIO_REGEX = re.compile(r'^[a-zA-Z][a-zA-Z0-9_-]{1,49}$')
 
 def campo_vacio(campo: str) -> str:
     """Campo vacio se encarga de validar que la entrada del usuario no este vacia
@@ -136,21 +144,57 @@ def login_otp(request: HttpRequest) -> HttpResponse:
 
 @decoradores.verificar_login_otp
 def panel(request):
-    t = "base.html"
+    t = "panel.html"
     errores = []
     if request.method == 'GET':
         return render(request,t)
 
 @decoradores.verificar_login_otp
 def registrar_servidor(request):
-    t = "base.html"
     errores = []
-    if request.method == 'GET':
-        return render(request,t)
+    if request.method == 'POST':
+        ip = request.POST.get('ip', '').strip()
+        ssh_key = request.POST.get('llave_ssh', '').strip()
+
+        # Validación: IP o dominio
+        try:
+            validate_ipv46_address(ip)  # Valida IPv4 o IPv6
+        except ValidationError:
+            # Si no es IP, verificamos si es un dominio válido básico (no exhaustivo)
+            if not re.match(r'^(?=.{1,253}$)((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,}$', ip):
+                errores.append("La IP o dominio no es válido.")
+        
+        # Validación de llave SSH (muy básica, solo comprobamos que no esté vacía)
+        if not ssh_key:
+            errores.append("La llave SSH no puede estar vacía.")
+
+        if not errores:
+            Servidor.objects.create(ip=ip, llave_ssh=ssh_key)
+            return redirect('/dashboard')
+
+    return render(request, 'panel.html', {'errores': errores, 'servidores': Servidor.objects.all()})
 
 @decoradores.verificar_login_otp
 def registrar_servicio(request):
-    t = "base.html"
     errores = []
-    if request.method == 'GET':
-        return render(request,t)
+    servidores = Servidor.objects.all()
+    
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        servidor_id = request.POST.get('servidor_id')
+
+        # Validar nombre de servicio
+        if not SERVICIO_REGEX.match(nombre):
+            errores.append("El nombre del servicio solo puede contener letras sin espacios ni caracteres especiales.")
+
+        try:
+            servidor = Servidor.objects.get(id=servidor_id)
+        except (Servidor.DoesNotExist, ValueError, TypeError):
+            errores.append("Servidor seleccionado no es válido.")
+            servidor = None
+
+        if not errores and servidor:
+            Servicio.objects.create(nombre=nombre, servidor=servidor)
+            return redirect('/dashboard')
+
+    return render(request, 'panel.html', {'errores': errores, 'servidores': servidores })
