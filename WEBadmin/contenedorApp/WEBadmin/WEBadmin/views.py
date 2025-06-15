@@ -9,13 +9,9 @@ from datetime import timedelta
 import paramiko
 from os import urandom
 
-from WEBadmin import settings
-from WEBadmin import hasher as hash
-from WEBadmin import decoradores
-from WEBadmin import login_chequeo as login_check
-from WEBadmin import enviar_otp as telegram
+from WEBadmin import settings, hasher as hash, decoradores, login_chequeo as login_check, enviar_otp as telegram
 from WEBadmin.forms import LoginForm
-from WEBadmin.verificaciones import esta_activo, puerto_abierto
+from WEBadmin.verificaciones import puerto_abierto
 
 from database.models import Usuario, OTP, ContadorIntentos, Servidor, Servicio
 
@@ -144,27 +140,25 @@ def login_otp(request: HttpRequest) -> HttpResponse:
 def panel(request):
     t = "panel.html"
     errores = []
+    if request.method == 'GET':
+        servidores = Servidor.objects.all()
+        servicios = Servicio.objects.select_related('servidor').all()
 
-    servidores = Servidor.objects.all()
-    servicios = Servicio.objects.select_related('servidor').all()
+        for servicio in servicios:
+            ip = str(servicio.servidor.ip)
+            puerto = servicio.puerto
 
-    for servidor in servidores:
-        if esta_activo(str(servidor.ip)):
-            servicios_del_servidor = servicios.filter(servidor=servidor)
-            for servicio in servicios_del_servidor:
-                if puerto_abierto(str(servidor.ip), servicio.puerto):
-                    servicio.estado = "activo"
-                else:
-                    servicio.estado = "inactivo"
-                servicio.save()
-        else:
-            servicios.filter(servidor=servidor).update(estado="servidor caído")
+            if puerto_abierto(ip, puerto):
+                servicio.estado = "activo"
+            else:
+                servicio.estado = "inactivo"
+            servicio.save()
 
-    return render(request, t, {
-        "servidores": servidores,
-        "servicios": Servicio.objects.select_related('servidor').all(),
-        "errores": errores
-    })
+        return render(request, t, {
+            "servidores": servidores,
+            "servicios": Servicio.objects.select_related('servidor').all(),
+            "errores": errores
+        })
 
 @decoradores.verificar_login_otp
 def registrar_servidor(request):
@@ -232,7 +226,51 @@ def registrar_servidor(request):
 
 @decoradores.verificar_login_otp
 def registrar_servicio(request):
-    t = "base.html"
+    t = "registrar_servicio.html"
     errores = []
+
     if request.method == 'GET':
-        return render(request,t)
+        servidores = Servidor.objects.all()
+        return render(request, t, {'servidores': servidores})
+
+    elif request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        ip_servidor = request.POST.get('servidor', '').strip()
+        puerto = request.POST.get('puerto', '').strip()
+
+        if not all([nombre, ip_servidor, puerto]):
+            errores.append("Todos los campos son obligatorios.")
+        else:
+            try:
+                puerto = int(puerto)
+                if puerto < 1 or puerto > 65535:
+                    raise ValueError()
+            except ValueError:
+                errores.append("El puerto debe ser un número entre 1 y 65535.")
+
+        try:
+            servidor = Servidor.objects.get(ip=ip_servidor)
+        except Servidor.DoesNotExist:
+            errores.append("Servidor no encontrado.")
+
+        if not errores:
+            servicio_existente = Servicio.objects.filter(servidor=servidor, puerto=puerto).first()
+            if servicio_existente:
+                errores.append("Ya existe un servicio en ese puerto para este servidor.")
+            else:
+                estado = "activo" if puerto_abierto(str(servidor.ip), puerto) else "inactivo"
+                Servicio.objects.create(
+                    nombre=nombre,
+                    servidor=servidor,
+                    puerto=puerto,
+                    estado=estado
+                )
+                return render(request, t, {
+                    'mensaje': f"Servicio '{nombre}' registrado correctamente.",
+                    'servidores': Servidor.objects.all()
+                })
+
+        return render(request, t, {
+            'errores': errores,
+            'servidores': Servidor.objects.all()
+        })
