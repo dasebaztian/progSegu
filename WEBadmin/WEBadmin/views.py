@@ -18,9 +18,10 @@ from WEBadmin import enviar_otp as telegram
 from django.core.validators import validate_ipv46_address
 from django.core.exceptions import ValidationError
 import re
+import paramiko
+import io
 
 
-SERVICIO_REGEX = re.compile(r'^[A-Za-z]+$')
 USUARIO_REGEX = re.compile(r'^[a-zA-Z][a-zA-Z0-9_-]{1,49}$')
 
 def campo_vacio(campo: str) -> str:
@@ -147,7 +148,77 @@ def panel(request):
     t = "panel.html"
     errores = []
     if request.method == 'GET':
-        return render(request,t)
+        servidores = Servidor.objects.all()
+        for servidor in servidores:
+            servicios_estado = []
+            for servicio in servidor.servicio_set.all():
+                estado = obtener_estado_via_ssh(servidor, servicio.nombre)
+                servicios_estado.append((servicio.nombre, estado))
+            servidor.servicios_con_estado = servicios_estado
+        return render(request, t, {'servidores': servidores})
+
+@decoradores.verificar_login_otp
+def controlar_servicio(request):
+    if request.method == 'POST':
+        servidor_ip = request.POST.get('servidor_ip')
+        servicio_nombre = request.POST.get('servicio_nombre')
+        accion = request.POST.get('accion')  # 'start' o 'stop'
+        errores = []
+        if accion in ['start', 'stop', 'restart']:
+
+        ##Falta sanitizar entrada del nombre del servicio
+            try:
+                servidor = Servidor.objects.get(ip=servidor_ip)
+            except Servidor.DoesNotExist:
+                errorres.append(request, f"Servidor '{servidor_ip}' no encontrado.")
+            try:
+                comando = f"sudo systemctl {accion} {servicio_nombre}"
+                ejecutar_comando_ssh(servidor, comando)
+            except Exception:
+                errores.append(f'Error al ejecutar {accion} en {servicio_nombre}')
+            if errores:
+                return render(request, 'panel.html', {'errores': errores, 'servidores': Servidor.objects.all()})
+    return redirect('/dashboard')
+
+def ejecutar_comando_ssh(servidor, comando):
+    try:
+        key = paramiko.RSAKey.from_private_key(io.StringIO(servidor.llave_ssh))
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=servidor.ip,
+            port=servidor.puerto,
+            username=servidor.usuario,
+            pkey=key
+        )
+        stdin, stdout, stderr = ssh.exec_command(comando)
+        estado = stderr.read().decode().strip()
+        ssh.close()
+    except Exception as e:
+        print(e) 
+
+#Se hace del lado del servidor no se necesita auth porque ya se valida en el panel jsj
+def obtener_estado_via_ssh(servidor, servicio_nombre):
+    try:
+        key_stream = io.StringIO(servidor.llave_ssh)
+        key = paramiko.RSAKey.from_private_key(key_stream)
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=servidor.ip,
+            port=servidor.puerto,
+            username=servidor.usuario,
+            pkey=key,
+            timeout=5
+        )
+
+        stdin, stdout, stderr = ssh.exec_command(f'systemctl is-active {servicio_nombre}')
+        estado = stdout.read().decode().strip()
+        ssh.close()
+        return estado
+    except Exception as e:
+        print(e)
 
 @decoradores.verificar_login_otp
 def registrar_servidor(request):
@@ -155,12 +226,12 @@ def registrar_servidor(request):
     if request.method == 'POST':
         ip = request.POST.get('ip', '').strip()
         ssh_key = request.POST.get('llave_ssh', '').strip()
+        usuario = request.POST.get('usuario', '').strip()
 
-        # Validación: IP o dominio
         try:
-            validate_ipv46_address(ip)  # Valida IPv4 o IPv6
+            validate_ipv46_address(ip)  
         except ValidationError:
-            # Si no es IP, verificamos si es un dominio válido básico (no exhaustivo)
+    
             if not re.match(r'^(?=.{1,253}$)((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,}$', ip):
                 errores.append("La IP o dominio no es válido.")
         
@@ -169,7 +240,7 @@ def registrar_servidor(request):
             errores.append("La llave SSH no puede estar vacía.")
 
         if not errores:
-            Servidor.objects.create(ip=ip, llave_ssh=ssh_key)
+            Servidor.objects.create(ip=ip, llave_ssh=ssh_key, usuario=usuario)
             return redirect('/dashboard')
 
     return render(request, 'panel.html', {'errores': errores, 'servidores': Servidor.objects.all()})
@@ -181,16 +252,12 @@ def registrar_servicio(request):
     
     if request.method == 'POST':
         nombre = request.POST.get('nombre', '').strip()
-        servidor_id = request.POST.get('servidor_id')
-
-        # Validar nombre de servicio
-        if not SERVICIO_REGEX.match(nombre):
-            errores.append("El nombre del servicio solo puede contener letras sin espacios ni caracteres especiales.")
+        servidor_ip = request.POST.get('servidor_ip')
 
         try:
-            servidor = Servidor.objects.get(id=servidor_id)
+            servidor = Servidor.objects.get(ip=servidor_ip)
         except (Servidor.DoesNotExist, ValueError, TypeError):
-            errores.append("Servidor seleccionado no es válido.")
+            errores.append(f"Servidor {servidor_ip} seleccionado no es válido.")
             servidor = None
 
         if not errores and servidor:

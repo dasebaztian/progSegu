@@ -25,7 +25,6 @@ class ContadorIntentos(models.Model):
     ultimo_intento = models.DateTimeField()
 
 class Servidor(models.Model):
-    nombre_servidor = models.CharField(max_length=50, unique=True)
     usuario = models.CharField(max_length=50)
     ip = models.GenericIPAddressField(primary_key=True)
     puerto = models.PositiveIntegerField(default=22)
@@ -36,11 +35,6 @@ class Servidor(models.Model):
 class Servicio(models.Model):
     nombre = models.CharField(
         max_length=100,
-        validators=[
-            RegexValidator(
-                regex=r'^[A-Za-z]+$',
-            )
-        ]
     )
     servidor = models.ForeignKey(Servidor, on_delete=models.CASCADE)
     class Meta:
