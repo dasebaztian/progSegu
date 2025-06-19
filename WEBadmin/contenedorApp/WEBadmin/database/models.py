@@ -24,7 +24,19 @@ class ContadorIntentos(models.Model):
     ultimo_intento = models.DateTimeField()
 
 class Servidor(models.Model):
-    nombre_servidor = models.CharField(max_length=50, unique=True)
     usuario = models.CharField(max_length=50)
     ip = models.GenericIPAddressField(primary_key=True)
     puerto = models.PositiveIntegerField(default=22)
+    llave_ssh = models.TextField(max_length=4000)
+    def __str__(self):
+        return f"{self.usuario}@{self.ip}"
+
+class Servicio(models.Model):
+    nombre = models.CharField(
+        max_length=100,
+    )
+    servidor = models.ForeignKey(Servidor, on_delete=models.CASCADE)
+    class Meta:
+        unique_together = ('nombre', 'servidor')
+    def __str__(self):
+        return f"{self.nombre} en {self.servidor}"

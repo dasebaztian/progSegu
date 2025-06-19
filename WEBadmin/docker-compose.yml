@@ -17,6 +17,7 @@ services:
          RECAPTCHA_PRIVATE_KEY: ${RECAPTCHA_PRIVATE_KEY}
          CHATID: ${CHATID}
          TOKEN: ${TOKEN}
+         CLAVE_FERNET: ${CLAVE_FERNET}
          
       volumes:
         - ./contenedorApp/WEBadmin:/code

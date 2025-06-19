@@ -2,18 +2,19 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.template import Template, Context
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
+import paramiko.ssh_exception
 
-from WEBadmin import settings
-from WEBadmin import hasher as hash
+from WEBadmin import settings, hasher as hash, decoradores, login_chequeo as login_check, enviar_otp as telegram, fernet_metodos
+
 from django.utils import timezone
 from datetime import timedelta
-from WEBadmin import decoradores
-from WEBadmin import login_chequeo as login_check
+
 from WEBadmin.forms import LoginForm
-from database.models import Usuario
-from database.models import OTP
-from database.models import ContadorIntentos
-from WEBadmin import enviar_otp as telegram
+from database.models import Usuario, OTP, ContadorIntentos, Servidor, Servicio
+
+from django.core.validators import validate_ipv46_address
+from django.core.exceptions import ValidationError
+import re, paramiko, io
 
 def campo_vacio(campo: str) -> str:
     """Campo vacio se encarga de validar que la entrada del usuario no este vacia
@@ -136,17 +137,67 @@ def login_otp(request: HttpRequest) -> HttpResponse:
 
 @decoradores.verificar_login_otp
 def panel(request):
-    t = "base.html"
+    t = "panel.html"
     errores = []
     if request.method == 'GET':
-        return render(request,t)
+        servidores = Servidor.objects.all()
+        for servidor in servidores:
+            servicios_estado = []
+            for servicio in servidor.servicio_set.all():
+                estado = obtener_estado_via_ssh(servidor, servicio.nombre)
+                servicios_estado.append((servicio.nombre, estado))
+            servidor.servicios_con_estado = servicios_estado
+        return render(request, t, {'servidores': servidores})
 
 @decoradores.verificar_login_otp
 def registrar_servidor(request):
-    t = "base.html"
     errores = []
-    if request.method == 'GET':
-        return render(request,t)
+    if request.method == 'POST':
+        ip = request.POST.get('ip', '').strip()
+        ssh_key = request.POST.get('llave_ssh', '').strip()
+        usuario = request.POST.get('usuario', '').strip()
+
+        try:
+            validate_ipv46_address(ip)  
+        except ValidationError:
+    
+            if not re.match(r'^(?=.{1,253}$)((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,}$', ip):
+                errores.append("La IP o dominio no es válido.")
+        
+
+        if not ssh_key:
+            errores.append("La llave SSH no puede estar vacía.")
+        elif not ('BEGIN OPENSSH PRIVATE KEY' in ssh_key or 'BEGIN RSA PRIVATE KEY' in ssh_key):
+            errores.append("La llave privada SSH no tiene un formato válido.")
+        else:
+            try:
+                key_obj = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
+            except paramiko.ssh_exception:
+                errores.append("No se pudo leer la llave privada SSH. ¿Es válida y sin passphrase?")
+
+        if not errores:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            try:
+                ssh.connect(
+                    hostname=ip,
+                    username=usuario,
+                    pkey=key_obj,
+                    timeout=5
+                )
+                ssh.close()
+
+            except Exception as e:
+                errores.append(f"No se pudo establecer conexión SSH: {str(e)}")
+    if not errores:
+            llave_cifrada = fernet_metodos.encriptar_llave_ssh(ssh_key)
+            Servidor.objects.create(ip=ip,
+                                    llave_ssh = llave_cifrada,
+                                    usuario=usuario)
+            
+            return redirect('/dashboard')
+    
+    return render(request, 'panel.html', {'errores': errores, 'servidores': Servidor.objects.all()})
 
 @decoradores.verificar_login_otp
 def registrar_servicio(request):
@@ -154,3 +205,25 @@ def registrar_servicio(request):
     errores = []
     if request.method == 'GET':
         return render(request,t)
+    
+def obtener_estado_via_ssh(servidor, servicio_nombre):
+    try:
+        key_stream = io.StringIO(fernet_metodos.desencriptar_llave_ssh(servidor.llave_ssh))
+        key = paramiko.RSAKey.from_private_key(key_stream)
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=servidor.ip,
+            port=servidor.puerto,
+            username=servidor.usuario,
+            pkey=key,
+            timeout=5
+        )
+
+        stdin, stdout, stderr = ssh.exec_command(f'systemctl is-active {servicio_nombre}')
+        estado = stdout.read().decode().strip()
+        ssh.close()
+        return estado
+    except Exception as e:
+        print(e)
