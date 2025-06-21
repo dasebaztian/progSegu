@@ -27,7 +27,7 @@ SECRET_KEY = str(os.environ.get('SECRET_KEY'))
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = ['https://webadmin']
@@ -124,8 +124,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-#STATIC_URL = 'static/'
-#STATICFILES_DIRS = (BASE_DIR.joinpath('static'), )
+STATIC_URL = 'static/'
+STATICFILES_DIRS = (BASE_DIR.joinpath('static'), )
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

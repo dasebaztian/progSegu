@@ -21,6 +21,7 @@ services:
          
       volumes:
         - ./contenedorApp/WEBadmin:/code
+        - ./contenedorApp/WEBadmin/static:/code/static
       deploy:
          resources:
             limits:

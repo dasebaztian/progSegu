@@ -4,6 +4,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, redirect
 import paramiko.ssh_exception
 
+
+
 from WEBadmin import settings, hasher as hash, decoradores, login_chequeo as login_check, enviar_otp as telegram, fernet_metodos
 
 from django.utils import timezone
@@ -141,13 +143,18 @@ def panel(request):
     errores = []
     if request.method == 'GET':
         servidores = Servidor.objects.all()
+
         for servidor in servidores:
             servicios_estado = []
             for servicio in servidor.servicio_set.all():
                 estado = obtener_estado_via_ssh(servidor, servicio.nombre)
                 servicios_estado.append((servicio.nombre, estado))
-            servidor.servicios_con_estado = servicios_estado
-        return render(request, t, {'servidores': servidores})
+            servidor.servicios_con_estado = servicios_estado 
+
+        return render(request, t, {
+            'servidores': servidores,
+            'errores': errores,
+        })
 
 @decoradores.verificar_login_otp
 def registrar_servidor(request):
@@ -201,16 +208,30 @@ def registrar_servidor(request):
 
 @decoradores.verificar_login_otp
 def registrar_servicio(request):
-    t = "base.html"
     errores = []
-    if request.method == 'GET':
-        return render(request,t)
+    servidores = Servidor.objects.all()
+    
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        servidor_ip = request.POST.get('servidor_ip')
+
+        try:
+            servidor = Servidor.objects.get(ip=servidor_ip)
+        except (Servidor.DoesNotExist, ValueError, TypeError):
+            errores.append(f"Servidor {servidor_ip} seleccionado no es válido.")
+            servidor = None
+
+        if not errores and servidor:
+            Servicio.objects.create(nombre=nombre, servidor=servidor)
+            return redirect('/dashboard')
+
+    return render(request, 'panel.html', {'errores': errores, 'servidores': servidores })
     
 def obtener_estado_via_ssh(servidor, servicio_nombre):
     try:
-        key_stream = io.StringIO(fernet_metodos.desencriptar_llave_ssh(servidor.llave_ssh))
+        llave_descifrada = fernet_metodos.desencriptar_llave_ssh(servidor.llave_ssh)
+        key_stream = io.StringIO(llave_descifrada)
         key = paramiko.RSAKey.from_private_key(key_stream)
-
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(
@@ -225,5 +246,66 @@ def obtener_estado_via_ssh(servidor, servicio_nombre):
         estado = stdout.read().decode().strip()
         ssh.close()
         return estado
+    except paramiko.AuthenticationException:
+        return "auth_error"
+    except paramiko.SSHException:
+        return "ssh_error"
     except Exception as e:
-        print(e)
+        return "conex_error"
+
+@decoradores.verificar_login_otp
+def controlar_servicio(request):
+    if request.method == 'POST':
+        servidor_ip = request.POST.get('servidor_ip', '').strip()
+        servicio_nombre = request.POST.get('servicio_nombre', '').strip()
+        accion = request.POST.get('accion', '').strip()
+        errores = []
+
+        if accion not in ['start', 'stop', 'restart']:
+            errores.append("Acción inválida.")
+
+        if not re.fullmatch(r'[a-zA-Z0-9_.-]+', servicio_nombre):
+            errores.append(f"Nombre de servicio inválido: {servicio_nombre}")
+
+        try:
+            servidor = Servidor.objects.get(ip=servidor_ip)
+        except Servidor.DoesNotExist:
+            errores.append(f"Servidor '{servidor_ip}' no encontrado.")
+
+        if servidor and not Servicio.objects.filter(nombre=servicio_nombre, servidor=servidor).exists():
+            errores.append(f"El servicio '{servicio_nombre}' no está registrado en el servidor {servidor_ip}.")
+
+        if not errores:
+            try:
+                comando = f"systemctl {accion} {servicio_nombre}"
+                ejecutar_comando_ssh(servidor, comando)
+            except Exception:
+                errores.append(f'Error al ejecutar {accion} en {servicio_nombre}')
+
+        if errores:
+            return render(request, 'panel.html', {
+                'errores': errores,
+                'servidores': Servidor.objects.all()
+            })
+
+    return redirect('/dashboard')
+
+def ejecutar_comando_ssh(servidor, comando):
+    try:
+        llave_descifrada = fernet_metodos.desencriptar_llave_ssh(servidor.llave_ssh)
+        key_stream = io.StringIO(llave_descifrada)
+        key = paramiko.RSAKey.from_private_key(key_stream)
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=servidor.ip,
+            port=servidor.puerto,
+            username=servidor.usuario,
+            pkey=key,
+            timeout=5
+        )
+        stdin, stdout, stderr = ssh.exec_command(comando)
+        estado = stderr.read().decode().strip()
+        ssh.close()
+    except Exception as e:
+        pass 

@@ -27,7 +27,7 @@ class Servidor(models.Model):
     usuario = models.CharField(max_length=50)
     ip = models.GenericIPAddressField(primary_key=True)
     puerto = models.PositiveIntegerField(default=22)
-    llave_ssh = models.TextField(max_length=4000)
+    llave_ssh = models.BinaryField()
     def __str__(self):
         return f"{self.usuario}@{self.ip}"
 
