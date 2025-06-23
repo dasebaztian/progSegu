@@ -157,6 +157,21 @@ def panel(request):
         })
 
 @decoradores.verificar_login_otp
+def estado_servicios(request):
+    if request.method == 'GET':
+        datos = {}
+        servidores = Servidor.objects.all()
+
+        for servidor in servidores:
+            servicios_estado = {}
+            for servicio in servidor.servicio_set.all():
+                estado = obtener_estado_via_ssh(servidor, servicio.nombre)
+                servicios_estado[servicio.nombre] = estado
+            datos[servidor.ip] = servicios_estado
+
+        return JsonResponse(datos)
+
+@decoradores.verificar_login_otp
 def registrar_servidor(request):
     errores = []
     if request.method == 'POST':

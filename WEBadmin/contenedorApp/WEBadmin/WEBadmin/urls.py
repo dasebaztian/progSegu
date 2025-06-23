@@ -26,5 +26,6 @@ urlpatterns = [
     path('signupservidor/', vistas.registrar_servidor),
     path('signupservicio/', vistas.registrar_servicio),
     path('controlarservicio/', vistas.controlar_servicio),
+    path('estado_servicios/', vistas.estado_servicios),
     path('', vistas.login),
 ]
